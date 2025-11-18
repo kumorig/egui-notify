@@ -12,7 +12,7 @@ readme = "README.md"
 path = "src/lib.rs"
 
 [dependencies]
-egui = { version = "0.32.1", default-features = false }
+egui = { version = "0.33", default-features = false }
 
 [dev-dependencies]
 eframe = { version = "0.32.1", default-features = false, features = [

@@ -207,7 +207,7 @@ impl Toasts {
             ..
         } = self;
 
-        let mut pos = anchor.screen_corner(ctx.input(|i| i.screen_rect.max), *margin);
+        let mut pos = anchor.screen_corner(ctx.input(|i| i.content_rect().max), *margin);
         let p = ctx.layer_painter(LayerId::new(Order::Foreground, Id::new("toasts")));
 
         // `held` used to prevent sticky removal
@@ -260,19 +260,19 @@ impl Toasts {
             let icon_font = FontId::proportional(icon_width);
             let icon_galley = match &toast.level {
                 ToastLevel::Info => {
-                    Some(ctx.fonts(|f| f.layout("ℹ".into(), icon_font, INFO_COLOR, f32::INFINITY)))
+                    Some(ctx.fonts_mut(|f| f.layout("ℹ".into(), icon_font, INFO_COLOR, f32::INFINITY)))
                 }
                 ToastLevel::Warning => Some(
-                    ctx.fonts(|f| f.layout("⚠".into(), icon_font, WARNING_COLOR, f32::INFINITY)),
+                    ctx.fonts_mut(|f| f.layout("⚠".into(), icon_font, WARNING_COLOR, f32::INFINITY)),
                 ),
                 ToastLevel::Error => Some(
-                    ctx.fonts(|f| f.layout("！".into(), icon_font, ERROR_COLOR, f32::INFINITY)),
+                    ctx.fonts_mut(|f| f.layout("！".into(), icon_font, ERROR_COLOR, f32::INFINITY)),
                 ),
                 ToastLevel::Success => Some(
-                    ctx.fonts(|f| f.layout("✅".into(), icon_font, SUCCESS_COLOR, f32::INFINITY)),
+                    ctx.fonts_mut(|f| f.layout("✅".into(), icon_font, SUCCESS_COLOR, f32::INFINITY)),
                 ),
                 ToastLevel::Custom(s, c) => {
-                    Some(ctx.fonts(|f| f.layout(s.clone(), icon_font, *c, f32::INFINITY)))
+                    Some(ctx.fonts_mut(|f| f.layout(s.clone(), icon_font, *c, f32::INFINITY)))
                 }
                 ToastLevel::None => None,
             };
@@ -285,14 +285,14 @@ impl Toasts {
             // Create closing cross
             let cross_galley = if toast.closable {
                 let cross_fid = FontId::proportional(icon_width);
-                let cross_galley = ctx.fonts(|f| {
-                    f.layout(
-                        "❌".into(),
-                        cross_fid,
-                        visuals.fg_stroke.color,
-                        f32::INFINITY,
-                    )
-                });
+            let cross_galley = ctx.fonts_mut(|f| {
+                f.layout(
+                    "❌".into(),
+                    cross_fid,
+                    visuals.fg_stroke.color,
+                    f32::INFINITY,
+                )
+            });
                 Some(cross_galley)
             } else {
                 None
