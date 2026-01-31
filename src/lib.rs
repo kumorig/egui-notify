@@ -18,10 +18,7 @@ use egui::{
 pub(crate) const TOAST_WIDTH: f32 = 180.;
 pub(crate) const TOAST_HEIGHT: f32 = 34.;
 
-const ERROR_COLOR: Color32 = Color32::from_rgb(200, 90, 90);
-const INFO_COLOR: Color32 = Color32::from_rgb(150, 200, 210);
 const WARNING_COLOR: Color32 = Color32::from_rgb(230, 220, 140);
-const SUCCESS_COLOR: Color32 = Color32::from_rgb(140, 230, 140);
 
 /// Main notifications collector.
 /// # Usage
