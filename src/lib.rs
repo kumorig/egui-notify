@@ -11,7 +11,7 @@ pub use anchor::*;
 pub use egui::__run_test_ctx;
 use egui::text::TextWrapping;
 use egui::{
-    vec2, Align, Color32, Context, CornerRadius, FontId, FontSelection, Id, LayerId, Order, Rect,
+    vec2, Align, Color32, Context, CornerRadius, FontId, FontSelection, Id, LayerId, Order,
     Shadow, Stroke, TextWrapMode, Vec2, WidgetText,
 };
 
@@ -207,7 +207,7 @@ impl Toasts {
             ..
         } = self;
 
-        let mut pos = anchor.screen_corner(ctx.input(|i| i.screen_rect.max), *margin);
+        let mut pos = anchor.screen_corner(ctx.input(|i| i.content_rect().max), *margin);
         let p = ctx.layer_painter(LayerId::new(Order::Foreground, Id::new("toasts")));
 
         // `held` used to prevent sticky removal
@@ -228,6 +228,28 @@ impl Toasts {
 
             let anim_offset = toast.width * (1. - ease_in_cubic(toast.value));
             pos.x += anim_offset * anchor.anim_side();
+
+            // Calculate caption galley first to determine dimensions
+            let caption_galley = toast.caption.clone().into_galley_impl(
+                ctx,
+                ctx.style().as_ref(),
+                TextWrapping::from_wrap_mode_and_width(TextWrapMode::Extend, f32::INFINITY),
+                FontSelection::Default,
+                Align::LEFT,
+            );
+
+            let (caption_width, caption_height) =
+                (caption_galley.rect.width(), caption_galley.rect.height());
+
+            let rounding = CornerRadius::same(4);
+
+            // Update toast dimensions BEFORE calculating rect
+            toast.width = padding.x.mul_add(2., caption_width);
+            let progress_bar_height = if toast.show_progress_bar { 6.0 } else { 0.0 };
+            let content_height = padding.y.mul_add(2., caption_height);
+            toast.height = content_height + progress_bar_height;
+
+            // Now calculate rect with correct dimensions
             let rect = toast.calc_anchored_rect(pos, *anchor);
 
             if let Some((_, d)) = toast.duration.as_mut() {
@@ -241,89 +263,6 @@ impl Toasts {
                 }
             }
 
-            let caption_galley = toast.caption.clone().into_galley_impl(
-                ctx,
-                ctx.style().as_ref(),
-                TextWrapping::from_wrap_mode_and_width(TextWrapMode::Extend, f32::INFINITY),
-                FontSelection::Default,
-                Align::LEFT,
-            );
-
-            let (caption_width, caption_height) =
-                (caption_galley.rect.width(), caption_galley.rect.height());
-
-            let line_count = toast.caption.text().chars().filter(|c| *c == '\n').count() + 1;
-            let icon_width = caption_height / line_count as f32;
-            let rounding = CornerRadius::same(4);
-
-            // Create toast icon
-            let icon_font = FontId::proportional(icon_width);
-            let icon_galley = match &toast.level {
-                ToastLevel::Info => {
-                    Some(ctx.fonts(|f| f.layout("ℹ".into(), icon_font, INFO_COLOR, f32::INFINITY)))
-                }
-                ToastLevel::Warning => Some(
-                    ctx.fonts(|f| f.layout("⚠".into(), icon_font, WARNING_COLOR, f32::INFINITY)),
-                ),
-                ToastLevel::Error => Some(
-                    ctx.fonts(|f| f.layout("！".into(), icon_font, ERROR_COLOR, f32::INFINITY)),
-                ),
-                ToastLevel::Success => Some(
-                    ctx.fonts(|f| f.layout("✅".into(), icon_font, SUCCESS_COLOR, f32::INFINITY)),
-                ),
-                ToastLevel::Custom(s, c) => {
-                    Some(ctx.fonts(|f| f.layout(s.clone(), icon_font, *c, f32::INFINITY)))
-                }
-                ToastLevel::None => None,
-            };
-
-            let (action_width, action_height) =
-                icon_galley.as_ref().map_or((0., 0.), |icon_galley| {
-                    (icon_galley.rect.width(), icon_galley.rect.height())
-                });
-
-            // Create closing cross
-            let cross_galley = if toast.closable {
-                let cross_fid = FontId::proportional(icon_width);
-                let cross_galley = ctx.fonts(|f| {
-                    f.layout(
-                        "❌".into(),
-                        cross_fid,
-                        visuals.fg_stroke.color,
-                        f32::INFINITY,
-                    )
-                });
-                Some(cross_galley)
-            } else {
-                None
-            };
-
-            let (cross_width, cross_height) =
-                cross_galley.as_ref().map_or((0., 0.), |cross_galley| {
-                    (cross_galley.rect.width(), cross_galley.rect.height())
-                });
-
-            let icon_x_padding = (0., padding.x);
-            let cross_x_padding = (padding.x, 0.);
-
-            let icon_width_padded = if icon_width == 0. {
-                0.
-            } else {
-                icon_width + icon_x_padding.0 + icon_x_padding.1
-            };
-            let cross_width_padded = if cross_width == 0. {
-                0.
-            } else {
-                cross_width + cross_x_padding.0 + cross_x_padding.1
-            };
-
-            toast.width = padding
-                .x
-                .mul_add(2., icon_width_padded + caption_width + cross_width_padded);
-            toast.height = padding
-                .y
-                .mul_add(2., action_height.max(caption_height).max(cross_height));
-
             // Required due to positioning of the next toast
             pos.x -= anim_offset * anchor.anim_side();
 
@@ -333,10 +272,10 @@ impl Toasts {
                 p.add(s);
             }
 
-            // Draw background + white border
+            // Draw background + border
             p.rect_filled(rect, rounding, visuals.bg_fill);
             {
-                let stroke = Stroke { width: 1.0, color: Color32::WHITE };
+                let stroke = Stroke { width: 1.0, color: visuals.bg_stroke.color };
                 // Top
                 p.line_segment([
                     rect.min,
@@ -359,53 +298,22 @@ impl Toasts {
                 ], stroke);
             }
 
-            // Paint icon
-            if let Some((icon_galley, true)) =
-                icon_galley.zip(Some(toast.level != ToastLevel::None))
-            {
-                let oy = toast.height / 2. - action_height / 2.;
-                let ox = padding.x + icon_x_padding.0;
-                p.galley(
-                    rect.min + vec2(ox, oy),
-                    icon_galley,
-                    visuals.fg_stroke.color,
-                );
-            }
+            // Calculate vertical offset for content centering (same for all elements)
+            let content_oy = content_height / 2. - caption_height / 2.;
 
-            // Paint caption
-            let oy = toast.height / 2. - caption_height / 2.;
-            let o_from_icon = if action_width == 0. {
-                0.
-            } else {
-                action_width + icon_x_padding.1
-            };
-            let o_from_cross = if cross_width == 0. {
-                0.
-            } else {
-                cross_width + cross_x_padding.0
-            };
-            let ox = (toast.width / 2. - caption_width / 2.) + o_from_icon / 2. - o_from_cross / 2.;
+            // Paint caption (centered in content area, above progress bar)
+            let ox = toast.width / 2. - caption_width / 2.;
             p.galley(
-                rect.min + vec2(ox, oy),
+                rect.min + vec2(ox, content_oy),
                 caption_galley,
                 visuals.fg_stroke.color,
             );
 
-            // Paint cross
-            if let Some(cross_galley) = cross_galley {
-                let cross_rect = cross_galley.rect;
-                let oy = toast.height / 2. - cross_height / 2.;
-                let ox = toast.width - cross_width - cross_x_padding.1 - padding.x;
-                let cross_pos = rect.min + vec2(ox, oy);
-                p.galley(cross_pos, cross_galley, Color32::BLACK);
-
-                let screen_cross = Rect {
-                    max: cross_pos + cross_rect.max.to_vec2(),
-                    min: cross_pos,
-                };
-
-                if let Some(pos) = ctx.input(|i| i.pointer.press_origin()) {
-                    if screen_cross.contains(pos) && !*held {
+            // Click anywhere to dismiss + pointer cursor
+            if let Some(hover_pos) = ctx.input(|i| i.pointer.hover_pos()) {
+                if rect.contains(hover_pos) {
+                    ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+                    if ctx.input(|i| i.pointer.primary_clicked()) && !*held {
                         toast.dismiss();
                         *held = true;
                     }
@@ -416,12 +324,13 @@ impl Toasts {
             if toast.show_progress_bar {
                 if let Some((initial, current)) = toast.duration {
                     if !toast.state.disappearing() {
+                        let bar_height = 6.0;
                         p.line_segment(
                             [
-                                rect.min + vec2(0., toast.height),
-                                rect.max - vec2((1. - (current / initial)) * toast.width, 0.),
+                                rect.min + vec2(0., toast.height - bar_height / 2.),
+                                rect.max - vec2((1. - (current / initial)) * toast.width, bar_height / 2.),
                             ],
-                            Stroke::new(4., visuals.fg_stroke.color),
+                            Stroke::new(bar_height, WARNING_COLOR),
                         );
                     }
                 }
