@@ -50,6 +50,13 @@ impl ToastState {
     }
 }
 
+/// Icon shown to the left of the toast caption.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ToastIcon {
+    /// A glowing trophy icon (painted via external callback).
+    Trophy,
+}
+
 /// Container for options for initlizing toasts
 pub struct ToastOptions {
     duration: Option<Duration>,
@@ -68,6 +75,7 @@ pub struct Toast {
     pub(crate) width: f32,
     pub(crate) closable: bool,
     pub(crate) show_progress_bar: bool,
+    pub(crate) icon: Option<ToastIcon>,
 
     pub(crate) state: ToastState,
     pub(crate) value: f32,
@@ -100,6 +108,7 @@ impl Toast {
             }),
             closable: options.closable,
             show_progress_bar: options.show_progress_bar,
+            icon: None,
             level: options.level,
             value: 0.,
             state: ToastState::Appear,
@@ -213,6 +222,12 @@ impl Toast {
     /// Toast's box width
     pub fn width(&mut self, width: f32) -> &mut Self {
         self.width = width;
+        self
+    }
+
+    /// Set an icon to display to the left of the caption.
+    pub fn icon(&mut self, icon: ToastIcon) -> &mut Self {
+        self.icon = Some(icon);
         self
     }
 

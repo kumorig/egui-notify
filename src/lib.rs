@@ -11,14 +11,19 @@ pub use anchor::*;
 pub use egui::__run_test_ctx;
 use egui::text::TextWrapping;
 use egui::{
-    vec2, Align, Color32, Context, CornerRadius, FontId, FontSelection, Id, LayerId, Order,
-    Shadow, Stroke, TextWrapMode, Vec2, WidgetText,
+    vec2, Align, Color32, Context, CornerRadius, FontId, FontSelection, Id, LayerId, Order, Painter,
+    Pos2, Shadow, Stroke, TextWrapMode, Vec2, WidgetText,
 };
 
 pub(crate) const TOAST_WIDTH: f32 = 180.;
 pub(crate) const TOAST_HEIGHT: f32 = 34.;
 
 const WARNING_COLOR: Color32 = Color32::from_rgb(230, 220, 140);
+
+/// Main notifications collector.
+/// Callback to paint a custom icon inside a toast.
+/// Arguments: painter, center position, icon size, animation time (seconds), icon variant.
+pub type IconPainterFn = Box<dyn Fn(&Painter, Pos2, f32, f64, &ToastIcon)>;
 
 /// Main notifications collector.
 /// # Usage
@@ -45,12 +50,13 @@ pub struct Toasts {
     font: Option<FontId>,
     shadow: Option<Shadow>,
     held: bool,
+    icon_painter: Option<IconPainterFn>,
 }
 
 impl Toasts {
     /// Creates new [`Toasts`] instance.
     #[must_use]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             anchor: Anchor::TopRight,
             margin: vec2(8., 8.),
@@ -62,6 +68,7 @@ impl Toasts {
             reverse: false,
             font: None,
             shadow: None,
+            icon_painter: None,
         }
     }
 
@@ -188,6 +195,12 @@ impl Toasts {
         self.font = Some(font);
         self
     }
+
+    /// Sets a callback to paint custom icons inside toasts.
+    pub fn with_icon_painter(mut self, painter: impl Fn(&Painter, Pos2, f32, f64, &ToastIcon) + 'static) -> Self {
+        self.icon_painter = Some(Box::new(painter));
+        self
+    }
 }
 
 impl Toasts {
@@ -240,8 +253,11 @@ impl Toasts {
 
             let rounding = CornerRadius::same(4);
 
+            // Reserve space for icon if present
+            let icon_area = if toast.icon.is_some() { caption_height + 4.0 } else { 0.0 };
+
             // Update toast dimensions BEFORE calculating rect
-            toast.width = padding.x.mul_add(2., caption_width);
+            toast.width = padding.x.mul_add(2., caption_width + icon_area);
             let progress_bar_height = if toast.show_progress_bar { 6.0 } else { 0.0 };
             let content_height = padding.y.mul_add(2., caption_height);
             toast.height = content_height + progress_bar_height;
@@ -298,8 +314,22 @@ impl Toasts {
             // Calculate vertical offset for content centering (same for all elements)
             let content_oy = content_height / 2. - caption_height / 2.;
 
+            // Paint icon if present
+            if let Some(ref icon) = toast.icon {
+                if let Some(ref painter_fn) = self.icon_painter {
+                    let icon_size = caption_height;
+                    let icon_center = Pos2::new(
+                        rect.min.x + padding.x + icon_size / 2.0,
+                        rect.min.y + content_height / 2.0,
+                    );
+                    let time = ctx.input(|i| i.time);
+                    painter_fn(&p, icon_center, icon_size, time, icon);
+                    update = true; // keep repainting for animation
+                }
+            }
+
             // Paint caption (centered in content area, above progress bar)
-            let ox = toast.width / 2. - caption_width / 2.;
+            let ox = icon_area + toast.width / 2. - (caption_width + icon_area) / 2.;
             p.galley(
                 rect.min + vec2(ox, content_oy),
                 caption_galley,
