@@ -11,8 +11,7 @@ pub use anchor::*;
 pub use egui::__run_test_ctx;
 use egui::text::TextWrapping;
 use egui::{
-    vec2, Align, Color32, Context, CornerRadius, FontId, FontSelection, Id, LayerId, Order, Painter,
-    Pos2, Shadow, Stroke, TextWrapMode, Vec2, WidgetText,
+    vec2, Align, Color32, Context, CornerRadius, FontId, FontSelection, Id, LayerId, Order, Painter, Pos2, Shadow, Stroke, TextWrapMode, Vec2, WidgetText,
 };
 
 pub(crate) const TOAST_WIDTH: f32 = 180.;
@@ -142,16 +141,8 @@ impl Toasts {
     }
 
     /// Shortcut for adding a toast with custom `level`.
-    pub fn custom(
-        &mut self,
-        caption: impl Into<WidgetText>,
-        level_string: String,
-        level_color: egui::Color32,
-    ) -> &mut Toast {
-        self.add(Toast::custom(
-            caption,
-            ToastLevel::Custom(level_string, level_color),
-        ))
+    pub fn custom(&mut self, caption: impl Into<WidgetText>, level_string: String, level_color: egui::Color32) -> &mut Toast {
+        self.add(Toast::custom(caption, ToastLevel::Custom(level_string, level_color)))
     }
 
     /// Should toasts be added in reverse order?
@@ -248,8 +239,7 @@ impl Toasts {
                 Align::LEFT,
             );
 
-            let (caption_width, caption_height) =
-                (caption_galley.rect.width(), caption_galley.rect.height());
+            let (caption_width, caption_height) = (caption_galley.rect.width(), caption_galley.rect.height());
 
             let rounding = CornerRadius::same(4);
 
@@ -288,27 +278,18 @@ impl Toasts {
             // Draw background + border
             p.rect_filled(rect, rounding, visuals.bg_fill);
             {
-                let stroke = Stroke { width: 1.0, color: visuals.bg_stroke.color };
+                let stroke = Stroke {
+                    width: 1.0,
+                    color: visuals.bg_stroke.color,
+                };
                 // Top
-                p.line_segment([
-                    rect.min,
-                    egui::pos2(rect.max.x, rect.min.y)
-                ], stroke);
+                p.line_segment([rect.min, egui::pos2(rect.max.x, rect.min.y)], stroke);
                 // Bottom
-                p.line_segment([
-                    egui::pos2(rect.min.x, rect.max.y),
-                    rect.max
-                ], stroke);
+                p.line_segment([egui::pos2(rect.min.x, rect.max.y), rect.max], stroke);
                 // Left
-                p.line_segment([
-                    rect.min,
-                    egui::pos2(rect.min.x, rect.max.y)
-                ], stroke);
+                p.line_segment([rect.min, egui::pos2(rect.min.x, rect.max.y)], stroke);
                 // Right
-                p.line_segment([
-                    egui::pos2(rect.max.x, rect.min.y),
-                    rect.max
-                ], stroke);
+                p.line_segment([egui::pos2(rect.max.x, rect.min.y), rect.max], stroke);
             }
 
             // Calculate vertical offset for content centering (same for all elements)
@@ -318,10 +299,7 @@ impl Toasts {
             if let Some(ref icon) = toast.icon {
                 if let Some(ref painter_fn) = self.icon_painter {
                     let icon_size = caption_height;
-                    let icon_center = Pos2::new(
-                        rect.min.x + padding.x + icon_size / 2.0,
-                        rect.min.y + content_height / 2.0,
-                    );
+                    let icon_center = Pos2::new(rect.min.x + padding.x + icon_size / 2.0, rect.min.y + content_height / 2.0);
                     let time = ctx.input(|i| i.time);
                     painter_fn(&p, icon_center, icon_size, time, icon);
                     update = true; // keep repainting for animation
@@ -330,11 +308,7 @@ impl Toasts {
 
             // Paint caption (centered in content area, above progress bar)
             let ox = icon_area + toast.width / 2. - (caption_width + icon_area) / 2.;
-            p.galley(
-                rect.min + vec2(ox, content_oy),
-                caption_galley,
-                visuals.fg_stroke.color,
-            );
+            p.galley(rect.min + vec2(ox, content_oy), caption_galley, visuals.fg_stroke.color);
 
             // Click anywhere to dismiss + pointer cursor
             if let Some(hover_pos) = ctx.input(|i| i.pointer.hover_pos()) {
